@@ -2,7 +2,7 @@ import { ObjectId } from "mongodb";
 
 import { Router, getExpressRouter } from "./framework/router";
 
-import { Friend, Post, User, WebSession } from "./app";
+import { Friend, NoteItem, Post, User, WebSession, itemConcepts } from "./app";
 import { PostDoc, PostOptions } from "./concepts/post";
 import { UserDoc } from "./concepts/user";
 import { WebSessionDoc } from "./concepts/websession";
@@ -68,7 +68,7 @@ class Routes {
     }
     return Responses.posts(posts);
   }
-
+  
   @Router.post("/posts")
   async createPost(session: WebSessionDoc, content: string, options?: PostOptions) {
     const user = WebSession.getUser(session);
@@ -88,6 +88,40 @@ class Routes {
     const user = WebSession.getUser(session);
     await Post.isAuthor(user, _id);
     return Post.delete(_id);
+  }
+
+  @Router.post("/notes")
+  async createNote(session: WebSessionDoc, content: string) {
+    const user = WebSession.getUser(session);
+    const created = await NoteItem.create(user, content);
+    return { msg: created.msg };
+  }
+
+  @Router.delete("/notes/:_id")
+  async deleteNote(session: WebSessionDoc, _id: ObjectId) {
+    const user = WebSession.getUser(session);
+    await NoteItem.isOwner(user, _id);
+    return NoteItem.delete(_id);
+  }
+
+  @Router.get("/items")
+  async getItems(itemType: keyof typeof itemConcepts, owner?: string) {
+    console.log("Get items of type", itemType)
+    const _itemType = itemConcepts[itemType];
+    console.log(_itemType);
+
+    const items = await _itemType.getItems({});
+    console.log(items);
+    return items;
+    // _itemType.getByAuthor
+    // let posts;
+    // if (owner) {
+    //   const id = (await User.getUserByUsername(owner))._id;
+    //   posts = await Post.getByAuthor(id);
+    // } else {
+    //   posts = await Post.getPosts({});
+    // }
+    // return Responses.posts(posts);
   }
 
   @Router.get("/friends")
