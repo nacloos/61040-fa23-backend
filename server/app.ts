@@ -13,7 +13,7 @@ export const Friend = new FriendConcept();
 
 // TODO: use same collection name for all items to allow searching any type of items?
 export const Note = new NoteConcept();
-export const NoteItem = new ShareableItemConcept<NoteConcept>(Note, "shareable-notes");
+export const NoteItem = new ShareableItemConcept<NoteConcept>(Note, "shareable-notes");  // collectionName = "items"
 
 // allow to have a generate getItems route where the item concept is an argument
 export const itemConcepts = { NoteItem };
@@ -21,3 +21,8 @@ export const itemConcepts = { NoteItem };
 // export const FigureItem = new ShareableItemConcept<Figure>("shareable-figures");
 // export const Note = new ShareableConcept<NoteConcept>();
 
+
+// TODO: add concept type as a tag to enable searching by type
+
+
+// Figure = composition of image, config, note, comments, tags

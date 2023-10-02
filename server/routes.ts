@@ -104,15 +104,34 @@ class Routes {
     return NoteItem.delete(_id);
   }
 
+  // @Router.delete("/items/:_id")
+  // async deleteItem(session: WebSessionDoc, _id: ObjectId) {
+  //   const user = WebSession.getUser(session);
+  //   await NoteItem.isOwner(user, _id);
+  //   return NoteItem.delete(_id);
+  // }
+
+
   @Router.get("/items")
   async getItems(itemType: keyof typeof itemConcepts, owner?: string) {
-    console.log("Get items of type", itemType)
-    const _itemType = itemConcepts[itemType];
-    console.log(_itemType);
+    let items;
+    if (owner) {
+      const id = (await User.getUserByUsername(owner))._id;
+      items = await NoteItem.getItems({ owner: id });
+    } else {
+      items = await NoteItem.getItems({});
+    }
+    
+    return items
+    // console.log("Get items of type", itemType)
+    // const _itemType = itemConcepts[itemType];
+    // console.log(_itemType);
 
-    const items = await _itemType.getItems({});
-    console.log(items);
-    return items;
+    // const items = await _itemType.getItems({});
+    // console.log(items);
+    // return items;
+
+
     // _itemType.getByAuthor
     // let posts;
     // if (owner) {

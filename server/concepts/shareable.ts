@@ -6,6 +6,7 @@ import { NotAllowedError, NotFoundError } from "./errors";
 
 interface ItemConcept {
     create(content: any): Promise<ObjectId>;
+    // get(id: ObjectId): Promise<any>;
     delete(id: ObjectId): void;
 }
 
@@ -15,6 +16,7 @@ export interface ShareableItemDoc extends BaseDoc {
     collaborators: ObjectId[];
 }
 
+// create user index to quickly get all the items accessible to a user?
 
 // synchronization between ShareableConcept and ItemConcept (here ShereableConcept is not implement in a separate class)
 export default class ShareableItemConcept<T extends ItemConcept> {
@@ -29,24 +31,58 @@ export default class ShareableItemConcept<T extends ItemConcept> {
     async create(owner: ObjectId, content: any) {
         const item = await this.itemConcept.create(content);
         const _id = await this.items.createOne({ owner, item });
-        return { msg: "Shareable item successfully created!", item: await this.items.readOne({ _id }) };
+        return { msg: "Shareable item successfully created!", item };
     }
-
-    async delete(id: ObjectId) {
+    
+    // TODO: don't want a note to be deleted without deleting the corresponding entry in shareables
+    async delete(_id: ObjectId) {
         // TODO: check that the user is the owner of the item here or in routes?
-        await this.itemConcept.delete(id);
+        const item = await this.getItem(_id);
+        const itemId = item.item;
+        // delete both the shareable and the underlying item
+        await this.itemConcept.delete(itemId);
+        await this.items.deleteOne({ _id });
+        return { msg: "Shareable item successfully deleted!" };
     }
 
-    async isOwner(user: ObjectId, _id: ObjectId) {
+    async getItem(_id: ObjectId) {
+        // const item = await this.itemConcept.get(_id);
         const item = await this.items.readOne({ _id });
         if (!item) {
           throw new NotFoundError(`Item ${_id} does not exist!`);
         }
+        return item
+    }
+
+    async isOwner(user: ObjectId, _id: ObjectId) {
+        const item = await this.getItem(_id);
         if (item.owner.toString() !== user.toString()) {
-          throw new ItemAuthorNotMatchError(user, _id);
+            throw new ItemOwnerNotMatchError(user, _id);
+        }
+    }
+    
+    async isCollaborator(user: ObjectId, _id: ObjectId) {
+        const item = await this.getItem(_id);
+        console.log(item.collaborators);
+
+        // TODO: need to convert to string?
+        if (item.collaborators.includes(user)) {
+          throw new ItemCollaboratorNotMatchError(user, _id);
         }
     }
 
+    async hasAccess(user: ObjectId, item: ObjectId) {
+        try {
+            await this.isOwner(user, item);
+        } catch (e) {
+            if (e instanceof ItemOwnerNotMatchError) {
+                await this.isCollaborator(user, item);
+            } else {
+                throw e;
+            }
+        }
+    }
+    
     async getItems(query: Filter<ShareableItemDoc>) {
         const items = await this.items.readMany(query, {
           sort: { dateUpdated: -1 },
@@ -60,14 +96,22 @@ export default class ShareableItemConcept<T extends ItemConcept> {
     // async addCollaborator();
     // async removeCollaborator();
     // async isOwner();
-    // async isCollaborator();
 }
 
-export class ItemAuthorNotMatchError extends NotAllowedError {
+export class ItemOwnerNotMatchError extends NotAllowedError {
     constructor(
         public readonly author: ObjectId,
         public readonly _id: ObjectId,
     ) {
-        super("{0} is not the author of post {1}!", author, _id);
+        super("{0} is not the owner of the item {1}!", author, _id);
+    }
+}   
+
+export class ItemCollaboratorNotMatchError extends NotAllowedError {
+    constructor(
+        public readonly author: ObjectId,
+        public readonly _id: ObjectId,
+    ) {
+        super("{0} is not a collaborator of the item {1}!", author, _id);
     }
 }
