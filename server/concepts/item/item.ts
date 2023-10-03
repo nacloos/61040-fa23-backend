@@ -1,7 +1,7 @@
 import { Filter, ObjectId } from "mongodb";
 
-import DocCollection, { BaseDoc } from "../framework/doc";
-import { NotAllowedError, NotFoundError } from "./errors";
+import DocCollection, { BaseDoc } from "../../framework/doc";
+import { NotAllowedError, NotFoundError } from "../errors";
 
 
 export interface BaseItemDoc extends BaseDoc {

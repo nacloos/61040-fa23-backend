@@ -2,11 +2,25 @@ import { ObjectId } from "mongodb";
 
 import { Router, getExpressRouter } from "./framework/router";
 
-import { Friend, NoteItem, Post, User, WebSession, itemConcepts } from "./app";
+import { 
+  Friend, 
+  NoteItem, 
+  ConfigItem, 
+  ImageItem, 
+  FigureItem, 
+  Post, 
+  User, 
+  WebSession, 
+  itemConcepts,
+  Note,
+  Config,
+  Image 
+} from "./app";
 import { PostDoc, PostOptions } from "./concepts/post";
 import { UserDoc } from "./concepts/user";
 import { WebSessionDoc } from "./concepts/websession";
 import Responses from "./responses";
+
 
 class Routes {
   @Router.get("/session")
@@ -94,7 +108,7 @@ class Routes {
   async createNote(session: WebSessionDoc, content: string) {
     const user = WebSession.getUser(session);
     const created = await NoteItem.create(user, content);
-    return { msg: created.msg };
+    return "Created note successfully!"
   }
 
   @Router.delete("/notes/:_id")
@@ -102,6 +116,47 @@ class Routes {
     const user = WebSession.getUser(session);
     await NoteItem.isOwner(user, _id);
     return NoteItem.delete(_id);
+  }
+
+
+  @Router.post("/configs")
+  async createConfig(session: WebSessionDoc, content: string) {
+    const user = WebSession.getUser(session);
+    const created = await ConfigItem.create(user, content);
+    return "Created config successfully!"
+  }
+
+  @Router.delete("/configs/:_id")
+  async deleteConfig(session: WebSessionDoc, _id: ObjectId) {
+    const user = WebSession.getUser(session);
+    await ConfigItem.isOwner(user, _id);
+    return ConfigItem.delete(_id);
+  }
+
+
+  @Router.post("/figures")
+  async createFigure(session: WebSessionDoc, imageURL: string, config: string, note: string) {
+    const user = WebSession.getUser(session);
+
+    // TODO: what if want to visualize a subitem separately?
+    // the figure as a whole is a shareable item but the subitems are not
+    // ensure that the figure is shared as a whole (e.g. don't want to just share the image without the config)
+    const noteId = await Note.create(note);
+    const configId = await Config.create(config);
+    const imageId = await Image.create(imageURL);
+
+    const createdFigure = await FigureItem.create(user, 
+      {image: imageId, config: configId, note: noteId}
+    );
+
+    return { msg: "Created figure successfully!" };
+  }
+
+  @Router.delete("/figures/:_id")
+  async deleteFigure(session: WebSessionDoc, _id: ObjectId) {
+    const user = WebSession.getUser(session);
+    await FigureItem.isOwner(user, _id);
+    return FigureItem.delete(_id);
   }
 
   // @Router.delete("/items/:_id")
@@ -112,35 +167,52 @@ class Routes {
   // }
 
 
+  @Router.delete("/items/all")
+  async deleteAllItems(session: WebSessionDoc) {
+    await NoteItem.deleteAll({});
+    await FigureItem.deleteAll({});
+    return { msg: "All items deleted!" };
+  }
+
+
   @Router.get("/items")
   async getItems(itemType: keyof typeof itemConcepts, owner?: string) {
+    const _itemType = itemConcepts[itemType];
+    console.log("Get items of type", itemType, _itemType);
+
     let items;
     if (owner) {
       const id = (await User.getUserByUsername(owner))._id;
-      items = await NoteItem.getItems({ owner: id });
+      items = await _itemType.getItems({ owner: id });
     } else {
-      items = await NoteItem.getItems({});
+      items = await _itemType.getItems({});
     }
     
-    return items
-    // console.log("Get items of type", itemType)
-    // const _itemType = itemConcepts[itemType];
-    // console.log(_itemType);
+    return items;
+  }
 
-    // const items = await _itemType.getItems({});
-    // console.log(items);
-    // return items;
+  @Router.get("/users/:username/items")
+  async getAccessibleItems(session: WebSessionDoc, username: string) {
+    const userId = (await User.getUserByUsername(username))._id;
+    return await FigureItem.getAccessibleItems(userId);
+  }
 
+  @Router.post("/figures/:_id/collaborators")
+  async addCollaborator(session: WebSessionDoc, _id: ObjectId, collaborator: string) {
+    const user = WebSession.getUser(session);
+    await FigureItem.isOwner(user, _id);
+    // TODO: make sure collaborator is different from owner and is not already a collaborator
 
-    // _itemType.getByAuthor
-    // let posts;
-    // if (owner) {
-    //   const id = (await User.getUserByUsername(owner))._id;
-    //   posts = await Post.getByAuthor(id);
-    // } else {
-    //   posts = await Post.getPosts({});
-    // }
-    // return Responses.posts(posts);
+    const collaboratorId = (await User.getUserByUsername(collaborator))._id;
+    return await FigureItem.addCollaborator(_id, collaboratorId);
+  }
+
+  @Router.delete("/figures/:_id/collaborators")
+  async removeCollaborator(session: WebSessionDoc, _id: ObjectId, collaborator: string) {
+    const user = WebSession.getUser(session);
+    await FigureItem.isOwner(user, _id);
+    const collaboratorId = (await User.getUserByUsername(collaborator))._id;
+    return await FigureItem.removeCollaborator(_id, collaboratorId);
   }
 
   @Router.get("/friends")

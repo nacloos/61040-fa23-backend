@@ -90,11 +90,47 @@ const operations: operation[] = [
     fields: { id: "input" },
   },
   {
+    name: "Create Figure",
+    endpoint: "/api/figures",
+    method: "POST",
+    fields: { imageURL: "input", config: "input", note: "input" },
+  },
+  {
+    name: "Delete Figure",
+    endpoint: "/api/figures/:id",
+    method: "DELETE",
+    fields: { id: "input" },
+  },
+  {
+    name: "Add collaborator",
+    endpoint: "/api/figures/:id/collaborators",
+    method: "POST",
+    fields: { id: "input", collaborator: "input" },
+  },
+  {
+    name: "Remove collaborator",
+    endpoint: "/api/figures/:id/collaborators",
+    method: "DELETE",
+    fields: { id: "input", collaborator: "input" },
+  },
+  {
     name: "Get items",
     endpoint: "/api/items",
     method: "GET",
-    fields: { itemType: "input", owner: "input" },
+    fields: { itemType: "input", owner: "input", collaborator: "input" },
   },
+  {
+    name: "Get accessible items",
+    endpoint: "/api/users/:username/items",
+    method: "GET",
+    fields: { username: "input" },
+  },
+  {
+    name: "Delete all items",
+    endpoint: "/api/items/all",
+    method: "DELETE",
+    fields: {},
+  }
 ];
 
 // Do not edit below here.

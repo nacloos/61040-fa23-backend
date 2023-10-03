@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 
-import DocCollection, { BaseDoc } from "../framework/doc";
+import DocCollection, { BaseDoc } from "../../framework/doc";
 
 
 export interface NoteDoc extends BaseDoc {
@@ -16,6 +16,14 @@ export default class NoteConcept {
         // return { msg: "Note successfully created!", note: await this.notes.readOne({ _id }) };
     }
 
+    async getItem(_id: ObjectId) {
+        const item = await this.notes.readOne({ _id });
+        if (!item) {
+          throw new Error(`Note ${_id} does not exist!`);
+        }
+        return item
+    }
+
     async update(_id: ObjectId, update: Partial<NoteDoc>) {
         await this.notes.updateOne({ _id }, update);
         return { msg: "Note successfully updated!" };
@@ -26,6 +34,10 @@ export default class NoteConcept {
         return { msg: "Note deleted successfully!" };
     }
 
+    async deleteAll() {
+        await this.notes.deleteMany({});
+        return { msg: "All notes deleted successfully!" };
+    }
 }
 
 
