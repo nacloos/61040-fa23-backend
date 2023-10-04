@@ -2,15 +2,6 @@ import { Filter, ObjectId } from "mongodb";
 
 import DocCollection, { BaseDoc } from "../framework/doc";
 import { NotAllowedError, NotFoundError } from "./errors";
-import { Router } from "express";
-
-
-interface ItemConcept {
-    create(content: any): Promise<ObjectId>;
-    getItem(id: ObjectId): Promise<any>;
-    delete(id: ObjectId): void;
-    deleteAll(query: Filter<any>): void;
-}
 
 
 export interface ShareableItemDoc extends BaseDoc {
@@ -19,40 +10,30 @@ export interface ShareableItemDoc extends BaseDoc {
     collaborators: ObjectId[];
 }
 
-// TODO: MongoDB index?
-export interface AccessibleItemDoc extends BaseDoc {
+
+export interface AccessibleToDoc extends BaseDoc {
     user: ObjectId;
-    items: ObjectId[];
+    item: ObjectId;
 }
 
-// create user index to quickly get all the items accessible to a user?
 
-// synchronization between ShareableConcept and ItemConcept (here ShereableConcept is not implement in a separate class)
-export default class ShareableItemConcept<T extends ItemConcept> {
+export default class ShareableConcept {
     public readonly items;
-    public readonly itemConcept: T;
     // store the items accessible to a user (owner or collaborator)
-    public readonly accessibleItems = new DocCollection<AccessibleItemDoc>("accessibleItems");
+    public readonly accessibleItems = new DocCollection<AccessibleToDoc>("accessibleItems");
 
-    constructor(itemConcept: T, collectionName: string) {
-        this.itemConcept = itemConcept;
+    constructor(collectionName: string) {
         this.items = new DocCollection<ShareableItemDoc>(collectionName);
     }
 
-    async create(owner: ObjectId, content: any) {
-        const item = await this.itemConcept.create(content);
+    async add(owner: ObjectId, item: ObjectId) {
         const _id = await this.items.createOne({ owner, item, collaborators: [] });
-        await this.accessibleItems.createOne({ user: owner, items: [_id] });
+        // await this.collaboration.create({ user: })
+        await this.accessibleItems.createOne({ user: owner, item: _id });
         return _id;
     }
     
-    // TODO: don't want a note to be deleted without deleting the corresponding entry in shareables
     async delete(_id: ObjectId) {
-        // TODO: check that the user is the owner of the item here or in routes?
-        const item = await this.getItem(_id);
-        const itemId = item.item;
-        // delete both the shareable and the underlying item
-        await this.itemConcept.delete(itemId);
         await this.items.deleteOne({ _id });
         await this.accessibleItems.deleteOne({ items: _id });
         return { msg: "Shareable item successfully deleted!" };
@@ -61,31 +42,25 @@ export default class ShareableItemConcept<T extends ItemConcept> {
     async deleteAll(query: Filter<ShareableItemDoc>) {
         // delete everything (useful for debugging)
         this.items.deleteMany(query);
-        this.itemConcept.deleteAll({});
         this.accessibleItems.deleteMany({});
         return { msg: "All items successfully deleted!" };
     }
 
     async addCollaborator(_id: ObjectId, collaborator: ObjectId) {
         await this.items.updateOne({ _id }, {}, { $push: { collaborators: collaborator } });
-        if (!await this.accessibleItems.readOne({ user: collaborator })) { 
-            await this.accessibleItems.createOne({ user: collaborator, items: [_id] });
-        } else {
-            await this.accessibleItems.updateOne({ user: collaborator }, {}, { $push: { items: _id } });
-        }
-        console.log(await this.accessibleItems.readOne({ user: collaborator }));
+        await this.accessibleItems.createOne({ user: collaborator, item: _id });
+        console.log("Add collab:", await this.accessibleItems.readMany({ user: collaborator }));
         return { msg: "Collaborator successfully added!" };
     }
 
     async removeCollaborator(_id: ObjectId, collaborator: ObjectId) {
         await this.items.updateOne({ _id }, {}, { $pull: { collaborators: collaborator } });
-        await this.accessibleItems.updateOne({ user: collaborator }, {}, { $pull: { items: _id } });
+        await this.accessibleItems.deleteOne({ user: collaborator, item: _id } );
         return { msg: "Collaborator successfully removed!" };
     }
 
     async getItem(_id: ObjectId) {
-        const item = await this.itemConcept.getItem(_id);
-        // const item = await this.items.readOne({ _id });
+        const item = await this.items.readOne({ _id });
         if (!item) {
           throw new NotFoundError(`Item ${_id} does not exist!`);
         }
@@ -94,6 +69,9 @@ export default class ShareableItemConcept<T extends ItemConcept> {
 
     async isOwner(user: ObjectId, _id: ObjectId) {
         const item = await this.items.readOne({ _id });
+        console.log("Item:", item);
+        console.log("User:", user);
+        console.log("---")
         if (!item) {
             throw new NotFoundError(`Item ${_id} does not exist!`);
         }
@@ -124,22 +102,22 @@ export default class ShareableItemConcept<T extends ItemConcept> {
     
     async getItems(query: Filter<ShareableItemDoc>) {
         const items = await this.items.readMany(query, {
-          sort: { dateUpdated: -1 },
+            sort: { dateUpdated: -1 },
         });
-        for (const item of items) {
-            // replace the item id with the item itself
-            item.item = await this.itemConcept.getItem(item.item);
-        }
+        // TODO: app sync
+        // for (const item of items) {
+        //     // replace the item id with the item itself
+        //     item.item = await this.itemConcept.getItem(item.item);
+        // }
         return items;
     }
 
     async getAccessibleItems(user: ObjectId) {
-        console.log(await this.accessibleItems.readMany({}))
-        const accessibleItems = await this.accessibleItems.readOne({ user });
+        const accessibleItems = await this.accessibleItems.readMany({ user });
         if (!accessibleItems) {
             throw new NotFoundError(`User ${user} does not have any items!`);
         }
-        return accessibleItems.items;
+        return accessibleItems;
         // const items = await this.getItems({ _id: { $in: accessibleItems.items } });
         // return items;
     }

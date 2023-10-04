@@ -15,10 +15,9 @@ export interface FigureDoc extends BaseDoc {
 export default class FigureConcept {
     public readonly figures = new DocCollection<FigureDoc>("figures");
 
-    async create(figure: FigureDoc) {
-        const _id = await this.figures.createOne(figure);
+    async create(image: ObjectId, config: ObjectId, note: ObjectId): Promise<ObjectId> {
+        const _id = await this.figures.createOne({ image, config, note });
         return _id;
-        // return await this.figures.readOne({ _id })
     }
 
     // TODO: general LinkedItem

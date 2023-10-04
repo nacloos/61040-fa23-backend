@@ -2,24 +2,21 @@ import { ObjectId } from "mongodb";
 
 import { Router, getExpressRouter } from "./framework/router";
 
-import { 
-  Friend, 
-  NoteItem, 
-  ConfigItem, 
-  ImageItem, 
-  FigureItem, 
-  Post, 
-  User, 
-  WebSession, 
-  itemConcepts,
-  Note,
+import {
   Config,
-  Image 
+  Figure,
+  Image,
+  Note,
+  ShareableFigure,
+  ShareableNote,
+  User,
+  WebSession
 } from "./app";
-import { PostDoc, PostOptions } from "./concepts/post";
+
+import { FigureDoc } from "./concepts/item/figure";
+import { NoteDoc } from "./concepts/item/note";
 import { UserDoc } from "./concepts/user";
 import { WebSessionDoc } from "./concepts/websession";
-import Responses from "./responses";
 
 
 class Routes {
@@ -71,196 +68,205 @@ class Routes {
     return { msg: "Logged out!" };
   }
 
-  @Router.get("/posts")
-  async getPosts(author?: string) {
-    let posts;
-    if (author) {
-      const id = (await User.getUserByUsername(author))._id;
-      posts = await Post.getByAuthor(id);
-    } else {
-      posts = await Post.getPosts({});
-    }
-    return Responses.posts(posts);
-  }
-  
-  @Router.post("/posts")
-  async createPost(session: WebSessionDoc, content: string, options?: PostOptions) {
-    const user = WebSession.getUser(session);
-    const created = await Post.create(user, content, options);
-    return { msg: created.msg, post: await Responses.post(created.post) };
-  }
-
-  @Router.patch("/posts/:_id")
-  async updatePost(session: WebSessionDoc, _id: ObjectId, update: Partial<PostDoc>) {
-    const user = WebSession.getUser(session);
-    await Post.isAuthor(user, _id);
-    return await Post.update(_id, update);
-  }
-
-  @Router.delete("/posts/:_id")
-  async deletePost(session: WebSessionDoc, _id: ObjectId) {
-    const user = WebSession.getUser(session);
-    await Post.isAuthor(user, _id);
-    return Post.delete(_id);
-  }
-
   @Router.post("/notes")
   async createNote(session: WebSessionDoc, content: string) {
     const user = WebSession.getUser(session);
-    const created = await NoteItem.create(user, content);
+    const note = await Note.create(content);
+    ShareableNote.add(user, note);
     return "Created note successfully!"
+  }
+
+  @Router.patch("/notes/:_id")
+  async updateNote(session: WebSessionDoc, _id: ObjectId, update: Partial<NoteDoc>) {
+    const user = WebSession.getUser(session);
+    await ShareableNote.isOwner(user, _id);
+    return await Note.update(_id, update);
   }
 
   @Router.delete("/notes/:_id")
   async deleteNote(session: WebSessionDoc, _id: ObjectId) {
     const user = WebSession.getUser(session);
-    await NoteItem.isOwner(user, _id);
-    return NoteItem.delete(_id);
+    await ShareableNote.isOwner(user, _id);
+    Note.delete(_id);
+    ShareableNote.delete(_id);
+    return "Deleted note successfully!"
   }
-
-
-  @Router.post("/configs")
-  async createConfig(session: WebSessionDoc, content: string) {
-    const user = WebSession.getUser(session);
-    const created = await ConfigItem.create(user, content);
-    return "Created config successfully!"
-  }
-
-  @Router.delete("/configs/:_id")
-  async deleteConfig(session: WebSessionDoc, _id: ObjectId) {
-    const user = WebSession.getUser(session);
-    await ConfigItem.isOwner(user, _id);
-    return ConfigItem.delete(_id);
-  }
-
 
   @Router.post("/figures")
   async createFigure(session: WebSessionDoc, imageURL: string, config: string, note: string) {
     const user = WebSession.getUser(session);
 
-    // TODO: what if want to visualize a subitem separately?
-    // the figure as a whole is a shareable item but the subitems are not
-    // ensure that the figure is shared as a whole (e.g. don't want to just share the image without the config)
     const noteId = await Note.create(note);
     const configId = await Config.create(config);
     const imageId = await Image.create(imageURL);
-
-    const createdFigure = await FigureItem.create(user, 
-      {image: imageId, config: configId, note: noteId}
-    );
+    const figId = await Figure.create(imageId, configId, noteId);    
+    // ensure that the figure is shared as a whole (e.g. don't want to just share the image without the config)
+    await ShareableFigure.add(user, figId);
 
     return { msg: "Created figure successfully!" };
+  }
+
+  @Router.patch("/figures/:_id")
+  async updateFigure(session: WebSessionDoc, _id: ObjectId, update: Partial<FigureDoc>) {
+    const user = WebSession.getUser(session);
+    await ShareableFigure.isOwner(user, _id);
+    return await Figure.update(_id, update);
   }
 
   @Router.delete("/figures/:_id")
   async deleteFigure(session: WebSessionDoc, _id: ObjectId) {
     const user = WebSession.getUser(session);
-    await FigureItem.isOwner(user, _id);
-    return FigureItem.delete(_id);
+    await ShareableFigure.isOwner(user, _id);
+    Figure.delete(_id);
+    ShareableFigure.delete(_id);
+    return "Deleted figure successfully!"
   }
 
-  // @Router.delete("/items/:_id")
-  // async deleteItem(session: WebSessionDoc, _id: ObjectId) {
-  //   const user = WebSession.getUser(session);
-  //   await NoteItem.isOwner(user, _id);
-  //   return NoteItem.delete(_id);
-  // }
-
-
-  @Router.delete("/items/all")
-  async deleteAllItems(session: WebSessionDoc) {
-    await NoteItem.deleteAll({});
-    await FigureItem.deleteAll({});
-    return { msg: "All items deleted!" };
-  }
-
-
-  @Router.get("/items")
-  async getItems(itemType: keyof typeof itemConcepts, owner?: string) {
-    const _itemType = itemConcepts[itemType];
-    console.log("Get items of type", itemType, _itemType);
-
-    let items;
-    if (owner) {
-      const id = (await User.getUserByUsername(owner))._id;
-      items = await _itemType.getItems({ owner: id });
-    } else {
-      items = await _itemType.getItems({});
+  @Router.get("/figures")
+  async getFigures() {
+      const items = await ShareableFigure.getItems({});
+      // for (const item of items) {
+      //     // replace the item id with the item itself
+      //     items.item = await Figure.getItem(item.item);
+      // }
+      return items;
     }
-    
-    return items;
-  }
+  
+   
 
   @Router.get("/users/:username/items")
-  async getAccessibleItems(session: WebSessionDoc, username: string) {
+  async getAccessibleItems(username: string) {
     const userId = (await User.getUserByUsername(username))._id;
-    return await FigureItem.getAccessibleItems(userId);
+  
+    const notes = await ShareableNote.getAccessibleItems(userId);
+    const figs = await ShareableFigure.getAccessibleItems(userId);
+    return notes.concat(figs);
   }
 
+  // TODO: add/remove collab for notes without duplicating code?
   @Router.post("/figures/:_id/collaborators")
   async addCollaborator(session: WebSessionDoc, _id: ObjectId, collaborator: string) {
     const user = WebSession.getUser(session);
-    await FigureItem.isOwner(user, _id);
+    await ShareableFigure.isOwner(user, _id);
     // TODO: make sure collaborator is different from owner and is not already a collaborator
-
     const collaboratorId = (await User.getUserByUsername(collaborator))._id;
-    return await FigureItem.addCollaborator(_id, collaboratorId);
+    return await ShareableFigure.addCollaborator(_id, collaboratorId);
   }
 
   @Router.delete("/figures/:_id/collaborators")
   async removeCollaborator(session: WebSessionDoc, _id: ObjectId, collaborator: string) {
     const user = WebSession.getUser(session);
-    await FigureItem.isOwner(user, _id);
+    await ShareableFigure.isOwner(user, _id);
     const collaboratorId = (await User.getUserByUsername(collaborator))._id;
-    return await FigureItem.removeCollaborator(_id, collaboratorId);
+    return await ShareableFigure.removeCollaborator(_id, collaboratorId);
   }
 
-  @Router.get("/friends")
-  async getFriends(session: WebSessionDoc) {
-    const user = WebSession.getUser(session);
-    return await User.idsToUsernames(await Friend.getFriends(user));
+
+  @Router.delete("/items")
+  async deleteAllItems(session: WebSessionDoc) {
+    await Note.deleteAll();
+    await Figure.deleteAll();
+    await ShareableFigure.deleteAll({});
+    return { msg: "All items deleted!" };
   }
 
-  @Router.delete("/friends/:friend")
-  async removeFriend(session: WebSessionDoc, friend: string) {
-    const user = WebSession.getUser(session);
-    const friendId = (await User.getUserByUsername(friend))._id;
-    return await Friend.removeFriend(user, friendId);
-  }
+  // @Router.get("/items")
+  // async getAllItems(owner?: string) {
 
-  @Router.get("/friend/requests")
-  async getRequests(session: WebSessionDoc) {
-    const user = WebSession.getUser(session);
-    return await Responses.friendRequests(await Friend.getRequests(user));
-  }
+  //   let items;
+  //   if (owner) {
+  //     const id = (await User.getUserByUsername(owner))._id;
+  //     items = await _itemType.getItems({ owner: id });
+  //   } else {
+  //     items = await _itemType.getItems({});
+  //   }
+    
+  //   return items;
+  // }
 
-  @Router.post("/friend/requests/:to")
-  async sendFriendRequest(session: WebSessionDoc, to: string) {
-    const user = WebSession.getUser(session);
-    const toId = (await User.getUserByUsername(to))._id;
-    return await Friend.sendRequest(user, toId);
-  }
+  // @Router.get("/posts")
+  // async getPosts(author?: string) {
+  //   let posts;
+  //   if (author) {
+  //     const id = (await User.getUserByUsername(author))._id;
+  //     posts = await Post.getByAuthor(id);
+  //   } else {
+  //     posts = await Post.getPosts({});
+  //   }
+  //   return Responses.posts(posts);
+  // }
+  
 
-  @Router.delete("/friend/requests/:to")
-  async removeFriendRequest(session: WebSessionDoc, to: string) {
-    const user = WebSession.getUser(session);
-    const toId = (await User.getUserByUsername(to))._id;
-    return await Friend.removeRequest(user, toId);
-  }
+  // Not used in this app
+  // @Router.post("/posts")
+  // async createPost(session: WebSessionDoc, content: string, options?: PostOptions) {
+  //   const user = WebSession.getUser(session);
+  //   const created = await Post.create(user, content, options);
+  //   return { msg: created.msg, post: await Responses.post(created.post) };
+  // }
 
-  @Router.put("/friend/accept/:from")
-  async acceptFriendRequest(session: WebSessionDoc, from: string) {
-    const user = WebSession.getUser(session);
-    const fromId = (await User.getUserByUsername(from))._id;
-    return await Friend.acceptRequest(fromId, user);
-  }
+  // @Router.patch("/posts/:_id")
+  // async updatePost(session: WebSessionDoc, _id: ObjectId, update: Partial<PostDoc>) {
+  //   const user = WebSession.getUser(session);
+  //   await Post.isAuthor(user, _id);
+  //   return await Post.update(_id, update);
+  // }
 
-  @Router.put("/friend/reject/:from")
-  async rejectFriendRequest(session: WebSessionDoc, from: string) {
-    const user = WebSession.getUser(session);
-    const fromId = (await User.getUserByUsername(from))._id;
-    return await Friend.rejectRequest(fromId, user);
-  }
+  // @Router.delete("/posts/:_id")
+  // async deletePost(session: WebSessionDoc, _id: ObjectId) {
+  //   const user = WebSession.getUser(session);
+  //   await Post.isAuthor(user, _id);
+  //   return Post.delete(_id);
+  // }
+
+
+
+  // @Router.get("/friends")
+  // async getFriends(session: WebSessionDoc) {
+  //   const user = WebSession.getUser(session);
+  //   return await User.idsToUsernames(await Friend.getFriends(user));
+  // }
+
+  // @Router.delete("/friends/:friend")
+  // async removeFriend(session: WebSessionDoc, friend: string) {
+  //   const user = WebSession.getUser(session);
+  //   const friendId = (await User.getUserByUsername(friend))._id;
+  //   return await Friend.removeFriend(user, friendId);
+  // }
+
+  // @Router.get("/friend/requests")
+  // async getRequests(session: WebSessionDoc) {
+  //   const user = WebSession.getUser(session);
+  //   return await Responses.friendRequests(await Friend.getRequests(user));
+  // }
+
+  // @Router.post("/friend/requests/:to")
+  // async sendFriendRequest(session: WebSessionDoc, to: string) {
+  //   const user = WebSession.getUser(session);
+  //   const toId = (await User.getUserByUsername(to))._id;
+  //   return await Friend.sendRequest(user, toId);
+  // }
+
+  // @Router.delete("/friend/requests/:to")
+  // async removeFriendRequest(session: WebSessionDoc, to: string) {
+  //   const user = WebSession.getUser(session);
+  //   const toId = (await User.getUserByUsername(to))._id;
+  //   return await Friend.removeRequest(user, toId);
+  // }
+
+  // @Router.put("/friend/accept/:from")
+  // async acceptFriendRequest(session: WebSessionDoc, from: string) {
+  //   const user = WebSession.getUser(session);
+  //   const fromId = (await User.getUserByUsername(from))._id;
+  //   return await Friend.acceptRequest(fromId, user);
+  // }
+
+  // @Router.put("/friend/reject/:from")
+  // async rejectFriendRequest(session: WebSessionDoc, from: string) {
+  //   const user = WebSession.getUser(session);
+  //   const fromId = (await User.getUserByUsername(from))._id;
+  //   return await Friend.rejectRequest(fromId, user);
+  // }
 }
 
 export default getExpressRouter(new Routes());
