@@ -132,7 +132,6 @@ class Routes {
       return items;
     }
   
-   
 
   @Router.get("/users/:username/items")
   async getAccessibleItems(username: string) {
@@ -169,6 +168,19 @@ class Routes {
     await ShareableFigure.deleteAll({});
     return { msg: "All items deleted!" };
   }
+
+
+  @Router.get("/items/comments")
+  async getComments(session: WebSessionDoc, item: ObjectId) {
+    return "TODO";
+  }
+
+  @Router.post("/items/comments")
+  async createComment(session: WebSessionDoc, item: ObjectId, content: string) {
+    return "TODO";
+  }
+
+
 
   // @Router.get("/items")
   // async getAllItems(owner?: string) {
