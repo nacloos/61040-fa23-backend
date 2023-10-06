@@ -10,6 +10,7 @@ export interface ShareableItemDoc extends BaseDoc {
     collaborators: ObjectId[];
 }
 
+// TODO: use separate collection for collaborators?
 
 export interface AccessibleToDoc extends BaseDoc {
     user: ObjectId;
@@ -69,9 +70,6 @@ export default class ShareableConcept {
 
     async isOwner(user: ObjectId, _id: ObjectId) {
         const item = await this.items.readOne({ _id });
-        console.log("Item:", item);
-        console.log("User:", user);
-        console.log("---")
         if (!item) {
             throw new NotFoundError(`Item ${_id} does not exist!`);
         }
@@ -82,7 +80,7 @@ export default class ShareableConcept {
     
     async isCollaborator(user: ObjectId, _id: ObjectId) {
         const item = await this.getItem(_id);
-        // TODO: need to convert to string?
+        // TODO: more efficient way to do this? (e.g. with separate collection for collaborators)
         if (item.collaborators.includes(user)) {
           throw new ItemCollaboratorNotMatchError(user, _id);
         }
@@ -99,6 +97,18 @@ export default class ShareableConcept {
             }
         }
     }
+
+    // TODO: is there a better way to do this?
+    async hasNotAccess(user: ObjectId, _id: ObjectId) {
+        const item = await this.items.readOne({ _id });
+        if (!item) {
+            throw new NotFoundError(`Item ${_id} does not exist!`);
+        }
+        if (item.owner.toString() === user.toString() || item.collaborators.some(c => c.toString() === user.toString())) {        
+            throw new NotAllowedError(`User ${user} has access to item ${item.toString()}!`);
+        }
+    }
+
     
     async getItems(query: Filter<ShareableItemDoc>) {
         const items = await this.items.readMany(query, {

@@ -12,6 +12,9 @@ export interface BaseItemDoc extends BaseDoc {
 // TODO
 // all other concepts should use a ItemConcept to manipulate items
 export default class ItemConcept {
+    getItem(itemId: ObjectId) {
+      throw new Error("Method not implemented.");
+    }
     public readonly items;
 
     constructor(schema: BaseDoc, collectionName: string) {

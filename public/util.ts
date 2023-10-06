@@ -77,23 +77,65 @@ const operations: operation[] = [
   //   method: "DELETE",
   //   fields: { id: "input" },
   // },
-  // {
-  //   name: "Create Note",
-  //   endpoint: "/api/notes",
-  //   method: "POST",
-  //   fields: { content: "input" },
-  // },
-  // {
-  //   name: "Delete Note",
-  //   endpoint: "/api/notes/:id",
-  //   method: "DELETE",
-  //   fields: { id: "input" },
-  // },
+  {
+    name: "Create Note",
+    endpoint: "/api/notes/:id",
+    method: "POST",
+    fields: { content: "input" },
+  },
+  {
+    name: "Update Note",
+    endpoint: "/api/notes/:id",
+    method: "PATCH",
+    fields: { id: "input", update: { content: "input" } },
+  },
+  {
+    name: "Delete Note",
+    endpoint: "/api/notes/:id",
+    method: "DELETE",
+    fields: { id: "input" },
+  },
+  {
+    name: "Get Notes",
+    endpoint: "/api/notes",
+    method: "GET",
+    fields: { },
+  },
+  {
+    name: "Add note collaborator",
+    endpoint: "/api/notes/:id/collaborators",
+    method: "POST",
+    fields: { id: "input", collaborator: "input" },
+  },
+  {
+    name: "Remove note collaborator",
+    endpoint: "/api/notes/:id/collaborators",
+    method: "DELETE",
+    fields: { id: "input", collaborator: "input" },
+  },
+  {
+    name: "Add note comment",
+    endpoint: "/api/notes/:id/comments",
+    method: "POST",
+    fields: { item: "input", content: "input" },
+  },
+  {
+    name: "Get note comments",
+    endpoint: "/api/notes/:id/comments",
+    method: "GET",
+    fields: { item: "input" },
+  },
   {
     name: "Create Figure",
     endpoint: "/api/figures",
     method: "POST",
     fields: { imageURL: "input", config: "input", note: "input" },
+  },
+  {
+    name: "Update Figure",
+    endpoint: "/api/figures/:id",
+    method: "PATCH",
+    fields: { id: "input", update: { imageURL: "input", config: "input", note: "input"}},
   },
   {
     name: "Delete Figure",
@@ -108,17 +150,30 @@ const operations: operation[] = [
     fields: { },
   },
   {
-    name: "Add collaborator",
+    name: "Add figure collaborator",
     endpoint: "/api/figures/:id/collaborators",
     method: "POST",
     fields: { id: "input", collaborator: "input" },
   },
   {
-    name: "Remove collaborator",
+    name: "Remove figure collaborator",
     endpoint: "/api/figures/:id/collaborators",
     method: "DELETE",
     fields: { id: "input", collaborator: "input" },
   },
+  {
+    name: "Add figure comment",
+    endpoint: "/api/figures/:id/comments",
+    method: "POST",
+    fields: { item: "input", content: "input" },
+  },
+  {
+    name: "Get figure comments",
+    endpoint: "/api/figures/:id/comments",
+    method: "GET",
+    fields: { item: "input" },
+  }
+
   // {
   //   name: "Get items",
   //   endpoint: "/api/items",

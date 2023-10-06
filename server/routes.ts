@@ -10,6 +10,8 @@ import {
   ShareableFigure,
   ShareableNote,
   User,
+  FigureComment,
+  NoteComment,
   WebSession
 } from "./app";
 
@@ -17,6 +19,37 @@ import { FigureDoc } from "./concepts/item/figure";
 import { NoteDoc } from "./concepts/item/note";
 import { UserDoc } from "./concepts/user";
 import { WebSessionDoc } from "./concepts/websession";
+import Responses from "./responses";
+
+
+type ShareableItemType = typeof ShareableFigure | typeof ShareableNote;
+type CommentItemType = typeof FigureComment | typeof NoteComment;
+
+// create item methods that are shared between the different item types
+async function addCollaborator(shareableItemType: ShareableItemType, session: WebSessionDoc, _id: ObjectId, collaborator: string) {
+  const user = WebSession.getUser(session);
+  await shareableItemType.isOwner(user, _id);    
+  const collaboratorId = (await User.getUserByUsername(collaborator))._id;
+  // make sure the collaborator has not already access to the note (i.e. is already a collaborator or owner)
+  await shareableItemType.hasNotAccess(collaboratorId, _id);
+  return await shareableItemType.addCollaborator(_id, collaboratorId);
+}
+
+async function removeCollaborator(shareableItemType: ShareableItemType, session: WebSessionDoc, _id: ObjectId, collaborator: string) {
+  const user = WebSession.getUser(session);
+  await shareableItemType.isOwner(user, _id);
+  const collaboratorId = (await User.getUserByUsername(collaborator))._id;
+  await shareableItemType.isCollaborator(collaboratorId, _id);
+  return await shareableItemType.removeCollaborator(_id, collaboratorId);
+}
+
+// async function createComment(commentItemType: CommentItemType, shareableItemType: ShareableItemType, session: WebSessionDoc, item: ObjectId, content: string) {
+//   const user = WebSession.getUser(session);
+//   // make sure the item is shareable and the user has access to it
+//   await shareableItemType.hasAccess(user, item);
+//   await commentItemType.create(user, item, content);
+//   return "Created comment successfully!"
+// }
 
 
 class Routes {
@@ -68,7 +101,8 @@ class Routes {
     return { msg: "Logged out!" };
   }
 
-  @Router.post("/notes")
+  // =========== Note routes ===========
+  @Router.post("/notes/:id")
   async createNote(session: WebSessionDoc, content: string) {
     const user = WebSession.getUser(session);
     const note = await Note.create(content);
@@ -92,6 +126,40 @@ class Routes {
     return "Deleted note successfully!"
   }
 
+  @Router.get("/notes")
+  async getNotes(session: WebSessionDoc) {
+    // const user = WebSession.getUser(session);
+    // const notes = await ShareableNote.getItems({ owner: user });
+    const notes = await ShareableNote.getItems({});
+    return Responses.items(Note, notes);
+  }
+
+  @Router.post("/notes/:_id/collaborators")
+  async addNoteCollaborator(session: WebSessionDoc, _id: ObjectId, collaborator: string) {
+    return addCollaborator(ShareableNote, session, _id, collaborator);
+  }
+
+  @Router.delete("/notes/:_id/collaborators")
+  async removeNoteCollaborator(session: WebSessionDoc, _id: ObjectId, collaborator: string) {
+    return removeCollaborator(ShareableNote, session, _id, collaborator);
+  }
+
+  @Router.post("/notes/:id/comments")
+  async createNoteComment(session: WebSessionDoc, item: ObjectId, content: string) {
+    const user = WebSession.getUser(session);
+    // make sure the item is shareable and the user has access to it
+    await ShareableNote.hasAccess(user, item);
+    await NoteComment.create(user, item, content);
+    return "Created comment successfully!"
+  }
+
+  @Router.get("/notes/:id/comments")
+  async getNoteComments(session: WebSessionDoc, item: ObjectId) {
+    return await NoteComment.getComments(item);
+  }
+
+
+  // =========== Figure routes ===========
   @Router.post("/figures")
   async createFigure(session: WebSessionDoc, imageURL: string, config: string, note: string) {
     const user = WebSession.getUser(session);
@@ -102,7 +170,6 @@ class Routes {
     const figId = await Figure.create(imageId, configId, noteId);    
     // ensure that the figure is shared as a whole (e.g. don't want to just share the image without the config)
     await ShareableFigure.add(user, figId);
-
     return { msg: "Created figure successfully!" };
   }
 
@@ -125,14 +192,37 @@ class Routes {
   @Router.get("/figures")
   async getFigures() {
       const items = await ShareableFigure.getItems({});
-      // for (const item of items) {
-      //     // replace the item id with the item itself
-      //     items.item = await Figure.getItem(item.item);
-      // }
-      return items;
+      console.log(items);
+      return Responses.items(Figure, items);
     }
   
+  // TODO: add/remove collab for notes without duplicating code?
+  @Router.post("/figures/:_id/collaborators")
+  async addFigureCollaborator(session: WebSessionDoc, _id: ObjectId, collaborator: string) {
+    return addCollaborator(ShareableFigure, session, _id, collaborator);
+  }
 
+  @Router.delete("/figures/:_id/collaborators")
+  async removeFigureCollaborator(session: WebSessionDoc, _id: ObjectId, collaborator: string) {
+    return removeCollaborator(ShareableFigure, session, _id, collaborator);
+   }
+
+  @Router.post("/figure/:id/comments")
+  async createFigureComment(session: WebSessionDoc, item: ObjectId, content: string) {
+    const user = WebSession.getUser(session);
+    // make sure the item is shareable and the user has access to it
+    await ShareableFigure.hasAccess(user, item);
+    await FigureComment.create(user, item, content);
+    return "Created comment successfully!"
+  }
+
+  @Router.get("/figure/:id/comments")
+  async getFigureComments(session: WebSessionDoc, item: ObjectId) {
+    return await FigureComment.getComments(item);
+  }
+
+
+  
   @Router.get("/users/:username/items")
   async getAccessibleItems(username: string) {
     const userId = (await User.getUserByUsername(username))._id;
@@ -140,24 +230,6 @@ class Routes {
     const notes = await ShareableNote.getAccessibleItems(userId);
     const figs = await ShareableFigure.getAccessibleItems(userId);
     return notes.concat(figs);
-  }
-
-  // TODO: add/remove collab for notes without duplicating code?
-  @Router.post("/figures/:_id/collaborators")
-  async addCollaborator(session: WebSessionDoc, _id: ObjectId, collaborator: string) {
-    const user = WebSession.getUser(session);
-    await ShareableFigure.isOwner(user, _id);
-    // TODO: make sure collaborator is different from owner and is not already a collaborator
-    const collaboratorId = (await User.getUserByUsername(collaborator))._id;
-    return await ShareableFigure.addCollaborator(_id, collaboratorId);
-  }
-
-  @Router.delete("/figures/:_id/collaborators")
-  async removeCollaborator(session: WebSessionDoc, _id: ObjectId, collaborator: string) {
-    const user = WebSession.getUser(session);
-    await ShareableFigure.isOwner(user, _id);
-    const collaboratorId = (await User.getUserByUsername(collaborator))._id;
-    return await ShareableFigure.removeCollaborator(_id, collaboratorId);
   }
 
 
@@ -168,19 +240,7 @@ class Routes {
     await ShareableFigure.deleteAll({});
     return { msg: "All items deleted!" };
   }
-
-
-  @Router.get("/items/comments")
-  async getComments(session: WebSessionDoc, item: ObjectId) {
-    return "TODO";
-  }
-
-  @Router.post("/items/comments")
-  async createComment(session: WebSessionDoc, item: ObjectId, content: string) {
-    return "TODO";
-  }
-
-
+  
 
   // @Router.get("/items")
   // async getAllItems(owner?: string) {

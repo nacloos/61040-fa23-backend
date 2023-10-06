@@ -1,6 +1,7 @@
 import FriendConcept from "./concepts/friend";
 import PostConcept from "./concepts/post";
 import ShareableConcept from "./concepts/shareable";
+import CommentConcept from "./concepts/comment";
 import UserConcept from "./concepts/user";
 import WebSessionConcept from "./concepts/websession";
 
@@ -27,7 +28,8 @@ export const Figure = new FigureConcept();
 export const ShareableNote = new ShareableConcept("shareable-notes");
 export const ShareableFigure = new ShareableConcept("shareable-figures");
 
-
+export const FigureComment = new CommentConcept("figure-comments");
+export const NoteComment = new CommentConcept("note-comments");
 
 // allow to have a generate getItems route where the item concept is an argument
 // export const itemConcepts = { NoteItem, FigureItem };
