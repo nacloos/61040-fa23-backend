@@ -172,8 +172,7 @@ const operations: operation[] = [
     endpoint: "/api/figures/:id/comments",
     method: "GET",
     fields: { item: "input" },
-  }
-
+  },
   // {
   //   name: "Get items",
   //   endpoint: "/api/items",
