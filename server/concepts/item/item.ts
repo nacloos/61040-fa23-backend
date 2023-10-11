@@ -9,8 +9,7 @@ export interface BaseItemDoc extends BaseDoc {
 }
 
 
-// TODO
-// all other concepts should use a ItemConcept to manipulate items
+// TODO: use a general item concept?
 export default class ItemConcept {
     getItem(itemId: ObjectId) {
       throw new Error("Method not implemented.");

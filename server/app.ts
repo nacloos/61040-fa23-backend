@@ -1,5 +1,5 @@
-import FriendConcept from "./concepts/friend";
-import PostConcept from "./concepts/post";
+// import FriendConcept from "./concepts/friend";
+// import PostConcept from "./concepts/post";
 import ShareableConcept from "./concepts/shareable";
 import CommentConcept from "./concepts/comment";
 import UserConcept from "./concepts/user";
@@ -14,16 +14,14 @@ import NoteConcept from "./concepts/item/note";
 // App Definition using concepts
 export const WebSession = new WebSessionConcept();
 export const User = new UserConcept();
-export const Post = new PostConcept();
-// export const Friend = new FriendConcept();
 
-// TODO: use same collection name for all items to allow searching any type of items?
-
-// TODO: make only Figure shareable? don't want to share an image without config?
 export const Note = new NoteConcept();
 export const Config = new ConfigConcept();
 export const Image = new ImageConcept();
 export const Figure = new FigureConcept();
+
+// export const Figure = new CompositeItemConcept({image: Image, config: Config, note: Note}, "figures")
+
 
 export const ShareableNote = new ShareableConcept("shareable-notes");
 export const ShareableFigure = new ShareableConcept("shareable-figures");
@@ -31,14 +29,6 @@ export const ShareableFigure = new ShareableConcept("shareable-figures");
 export const FigureComment = new CommentConcept("figure-comments");
 export const NoteComment = new CommentConcept("note-comments");
 
-// allow to have a generate getItems route where the item concept is an argument
-// export const itemConcepts = { NoteItem, FigureItem };
 
-// export const FigureItem = new ShareableItemConcept<Figure>("shareable-figures");
-// export const Note = new ShareableConcept<NoteConcept>();
-
-
-// TODO: add concept type as a tag to enable searching by type
-
-
-// Figure = composition of image, config, note, comments, tags
+// export const Post = new PostConcept();
+// export const Friend = new FriendConcept();

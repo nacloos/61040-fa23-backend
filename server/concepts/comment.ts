@@ -1,6 +1,5 @@
 import { ObjectId } from "mongodb";
 import DocCollection, { BaseDoc } from "../framework/doc";
-import { BadValuesError, NotAllowedError, NotFoundError } from "./errors";
 
 
 export interface CommentDoc extends BaseDoc {
@@ -25,5 +24,4 @@ export default class CommentConcept {
         const comments = await this.comments.readMany({ item });
         return comments;
     }
-
 }

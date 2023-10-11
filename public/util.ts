@@ -129,13 +129,13 @@ const operations: operation[] = [
     name: "Create Figure",
     endpoint: "/api/figures",
     method: "POST",
-    fields: { imageURL: "input", config: "input", note: "input" },
+    fields: { image: "input", config: "input", note: "input" },
   },
   {
     name: "Update Figure",
     endpoint: "/api/figures/:id",
     method: "PATCH",
-    fields: { id: "input", update: { imageURL: "input", config: "input", note: "input"}},
+    fields: { id: "input", update: { image: "input", config: "input", note: "input"}},
   },
   {
     name: "Delete Figure",

@@ -7,10 +7,10 @@ import { NotAllowedError, NotFoundError } from "./errors";
 export interface ShareableItemDoc extends BaseDoc {
     owner: ObjectId;
     item: ObjectId;
+    // could use separate collection for collaborators
     collaborators: ObjectId[];
 }
 
-// TODO: use separate collection for collaborators?
 
 export interface AccessibleToDoc extends BaseDoc {
     user: ObjectId;
@@ -29,7 +29,6 @@ export default class ShareableConcept {
 
     async add(owner: ObjectId, item: ObjectId) {
         const _id = await this.items.createOne({ owner, item, collaborators: [] });
-        // await this.collaboration.create({ user: })
         await this.accessibleItems.createOne({ user: owner, item: _id });
         return _id;
     }
@@ -68,6 +67,12 @@ export default class ShareableConcept {
         return item
     }
 
+    async getItemId(_id: ObjectId) {
+        // return the id of the underlying item
+        const item = await this.getItem(_id);
+        return item.item;
+    }
+
     async isOwner(user: ObjectId, _id: ObjectId) {
         const item = await this.items.readOne({ _id });
         if (!item) {
@@ -98,7 +103,7 @@ export default class ShareableConcept {
         }
     }
 
-    // TODO: is there a better way to do this?
+    // TODO: is there a better way to do this? Reuse hasAccess?
     async hasNotAccess(user: ObjectId, _id: ObjectId) {
         const item = await this.items.readOne({ _id });
         if (!item) {
@@ -108,17 +113,11 @@ export default class ShareableConcept {
             throw new NotAllowedError(`User ${user} has access to item ${item.toString()}!`);
         }
     }
-
     
     async getItems(query: Filter<ShareableItemDoc>) {
         const items = await this.items.readMany(query, {
             sort: { dateUpdated: -1 },
         });
-        // TODO: app sync
-        // for (const item of items) {
-        //     // replace the item id with the item itself
-        //     item.item = await this.itemConcept.getItem(item.item);
-        // }
         return items;
     }
 
@@ -128,17 +127,7 @@ export default class ShareableConcept {
             throw new NotFoundError(`User ${user} does not have any items!`);
         }
         return accessibleItems;
-        // const items = await this.getItems({ _id: { $in: accessibleItems.items } });
-        // return items;
     }
-
-
-    // async update();
-    // async delete();
-    // async hasAccess();
-    // async addCollaborator();
-    // async removeCollaborator();
-    // async isOwner();
 }
 
 export class ItemOwnerNotMatchError extends NotAllowedError {

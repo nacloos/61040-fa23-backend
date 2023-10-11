@@ -15,38 +15,55 @@ import {
   WebSession
 } from "./app";
 
-import { FigureDoc } from "./concepts/item/figure";
+import { FigureDoc, FigureUpdateType } from "./concepts/item/figure";
 import { NoteDoc } from "./concepts/item/note";
 import { UserDoc } from "./concepts/user";
 import { WebSessionDoc } from "./concepts/websession";
 import Responses from "./responses";
 
 
-type ShareableItemType = typeof ShareableFigure | typeof ShareableNote;
+type ItemType = typeof Figure | typeof Note;
+type ShareableType = typeof ShareableFigure | typeof ShareableNote;
 type CommentItemType = typeof FigureComment | typeof NoteComment;
 
 // create item methods that are shared between the different item types
-async function addCollaborator(shareableItemType: ShareableItemType, session: WebSessionDoc, _id: ObjectId, collaborator: string) {
+async function updateItem(shareableType: ShareableType, itemType: ItemType, session: WebSessionDoc, _id: ObjectId, update: Partial<FigureUpdateType | NoteDoc>) {
   const user = WebSession.getUser(session);
-  await shareableItemType.isOwner(user, _id);    
+  await shareableType.isOwner(user, _id);
+  const itemId = await shareableType.getItemId(_id);
+  return await itemType.update(itemId, update);
+}
+
+async function deleteItem(shareableType: ShareableType, itemType: ItemType, session: WebSessionDoc, _id: ObjectId) {
+  const user = WebSession.getUser(session);
+  await shareableType.isOwner(user, _id);
+  const itemId = await shareableType.getItemId(_id);
+  await itemType.delete(itemId);
+  await shareableType.delete(_id);
+  return `Deleted ${itemType.constructor.name} successfully!`
+}
+
+async function addCollaborator(shareableType: ShareableType, session: WebSessionDoc, _id: ObjectId, collaborator: string) {
+  const user = WebSession.getUser(session);
+  await shareableType.isOwner(user, _id);    
   const collaboratorId = (await User.getUserByUsername(collaborator))._id;
   // make sure the collaborator has not already access to the note (i.e. is already a collaborator or owner)
-  await shareableItemType.hasNotAccess(collaboratorId, _id);
-  return await shareableItemType.addCollaborator(_id, collaboratorId);
+  await shareableType.hasNotAccess(collaboratorId, _id);
+  return await shareableType.addCollaborator(_id, collaboratorId);
 }
 
-async function removeCollaborator(shareableItemType: ShareableItemType, session: WebSessionDoc, _id: ObjectId, collaborator: string) {
+async function removeCollaborator(shareableType: ShareableType, session: WebSessionDoc, _id: ObjectId, collaborator: string) {
   const user = WebSession.getUser(session);
-  await shareableItemType.isOwner(user, _id);
+  await shareableType.isOwner(user, _id);
   const collaboratorId = (await User.getUserByUsername(collaborator))._id;
-  await shareableItemType.isCollaborator(collaboratorId, _id);
-  return await shareableItemType.removeCollaborator(_id, collaboratorId);
+  await shareableType.isCollaborator(collaboratorId, _id);
+  return await shareableType.removeCollaborator(_id, collaboratorId);
 }
 
-// async function createComment(commentItemType: CommentItemType, shareableItemType: ShareableItemType, session: WebSessionDoc, item: ObjectId, content: string) {
+// async function createComment(commentItemType: CommentItemType, shareableType: ShareableType, session: WebSessionDoc, item: ObjectId, content: string) {
 //   const user = WebSession.getUser(session);
 //   // make sure the item is shareable and the user has access to it
-//   await shareableItemType.hasAccess(user, item);
+//   await shareableType.hasAccess(user, item);
 //   await commentItemType.create(user, item, content);
 //   return "Created comment successfully!"
 // }
@@ -112,18 +129,16 @@ class Routes {
 
   @Router.patch("/notes/:_id")
   async updateNote(session: WebSessionDoc, _id: ObjectId, update: Partial<NoteDoc>) {
-    const user = WebSession.getUser(session);
-    await ShareableNote.isOwner(user, _id);
-    return await Note.update(_id, update);
+    return updateItem(ShareableNote, Note, session, _id, update);
+    // const user = WebSession.getUser(session);
+    // await ShareableNote.isOwner(user, _id);
+    // const noteId = await ShareableNote.getItemId(_id);
+    // return await Note.update(noteId, update);
   }
 
   @Router.delete("/notes/:_id")
   async deleteNote(session: WebSessionDoc, _id: ObjectId) {
-    const user = WebSession.getUser(session);
-    await ShareableNote.isOwner(user, _id);
-    Note.delete(_id);
-    ShareableNote.delete(_id);
-    return "Deleted note successfully!"
+    return deleteItem(ShareableNote, Note, session, _id);
   }
 
   @Router.get("/notes")
@@ -175,18 +190,21 @@ class Routes {
 
   @Router.patch("/figures/:_id")
   async updateFigure(session: WebSessionDoc, _id: ObjectId, update: Partial<FigureDoc>) {
-    const user = WebSession.getUser(session);
-    await ShareableFigure.isOwner(user, _id);
-    return await Figure.update(_id, update);
+    return updateItem(ShareableFigure, Figure, session, _id, update);
+    // const user = WebSession.getUser(session);
+    // await ShareableFigure.isOwner(user, _id);
+    // return await Figure.update(_id, update);
   }
 
   @Router.delete("/figures/:_id")
   async deleteFigure(session: WebSessionDoc, _id: ObjectId) {
-    const user = WebSession.getUser(session);
-    await ShareableFigure.isOwner(user, _id);
-    Figure.delete(_id);
-    ShareableFigure.delete(_id);
-    return "Deleted figure successfully!"
+    return deleteItem(ShareableFigure, Figure, session, _id);
+    // const user = WebSession.getUser(session);
+    // await ShareableFigure.isOwner(user, _id);
+    // const figId = await ShareableFigure.getItemId(_id);
+    // Figure.delete(figId);
+    // ShareableFigure.delete(_id);
+    // return "Deleted figure successfully!"
   }
 
   @Router.get("/figures")
@@ -196,7 +214,6 @@ class Routes {
       return Responses.items(Figure, items);
     }
   
-  // TODO: add/remove collab for notes without duplicating code?
   @Router.post("/figures/:_id/collaborators")
   async addFigureCollaborator(session: WebSessionDoc, _id: ObjectId, collaborator: string) {
     return addCollaborator(ShareableFigure, session, _id, collaborator);

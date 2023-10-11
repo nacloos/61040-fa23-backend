@@ -22,6 +22,7 @@ export default class Responses {
     }
     const itemId = shareableItem.item
     const item = await itemConcept.getItem(itemId);
+    item["_id"] = itemId;
     return { ...shareableItem, item: item };
   }
 
@@ -89,3 +90,4 @@ Router.registerError(AlreadyFriendsError, async (e) => {
   const [user1, user2] = await Promise.all([User.getUserById(e.user1), User.getUserById(e.user2)]);
   return e.formatWith(user1.username, user2.username);
 });
+
